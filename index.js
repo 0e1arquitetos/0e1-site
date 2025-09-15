@@ -23,7 +23,7 @@ function renderRichText(richTextArray) {
     return html;
 }
 
-// Esta função agora é assíncrona para buscar o conteúdo de blocos sincronizados
+// Esta função agora é assíncrona para buscar o conteúdo de blocos sincronizados e de links
 async function renderBlocksToHtml(blocks) {
     let htmlContent = '';
 
@@ -53,6 +53,7 @@ async function renderBlocksToHtml(blocks) {
                 htmlContent += `<p>[Conteúdo de base de dados embutida. Requer uma requisição separada para ser exibido.]</p>`;
                 break;
             case 'child_page':
+                // A navegação entre páginas já é feita nas rotas do Express.
                 htmlContent += `<h4><a href="/${blockContent.title.toLowerCase().replace(/\s/g, '-')}" >${blockContent.title}</a></h4>`;
                 break;
             case 'synced_block':
@@ -60,6 +61,31 @@ async function renderBlocksToHtml(blocks) {
                     const syncedBlockId = blockContent.synced_from.block_id;
                     const syncedChildren = await notion.blocks.children.list({ block_id: syncedBlockId });
                     htmlContent += await renderBlocksToHtml(syncedChildren.results);
+                }
+                break;
+            case 'link_to_page':
+                const linkedPageId = blockContent.page_id;
+                try {
+                    // Busca as propriedades da página para obter o título
+                    const page = await notion.pages.retrieve({ page_id: linkedPageId });
+                    const pageTitle = page.properties.title?.title[0]?.plain_text || 'Link';
+                    let pageSlug = pageTitle.toLowerCase().replace(/\s/g, '-');
+
+                    // Verifica se o link é para uma página de projeto
+                    const databaseResponse = await notion.databases.query({
+                        database_id: process.env.NOTION_DATABASE_ID,
+                        filter: { property: 'URL', rich_text: { equals: page.properties.URL?.rich_text[0]?.plain_text || page.id } }
+                    });
+
+                    if (databaseResponse.results.length > 0) {
+                        pageSlug = `projetos/${databaseResponse.results[0].properties.URL?.rich_text[0]?.plain_text}`;
+                    }
+                    
+                    htmlContent += `<h4><a href="/${pageSlug}">${pageTitle}</a></h4>`;
+
+                } catch (error) {
+                    console.error(`Erro ao buscar página com ID ${linkedPageId}:`, error.body || error);
+                    htmlContent += `<h4>Link Quebrado</h4>`;
                 }
                 break;
             default:
@@ -70,6 +96,7 @@ async function renderBlocksToHtml(blocks) {
     return htmlContent;
 }
 
+// Esta função também se torna assíncrona por chamar a função de renderização
 async function renderPageById(pageId) {
     try {
         const blocks = await notion.blocks.children.list({ block_id: pageId });
