@@ -3,7 +3,7 @@
 require('dotenv').config();
 
 const express = require('express');
-const { Client } = require('https://deno.land/x/notion/mod.ts');
+const { Client } = require('@notionhq/client'); // Esta linha foi corrigida.
 
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
 
