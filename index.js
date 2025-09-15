@@ -3,7 +3,7 @@
 require('dotenv').config();
 
 const express = require('express');
-const { Client } = require('@notionhq/client');
+const { Client } = require('https://deno.land/x/notion/mod.ts');
 
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
 
@@ -175,9 +175,13 @@ app.get('/', async (req, res) => {
         }
     });
 
+    // Inspecione o retorno da API no console para verificar os nomes das propriedades
+    console.log(JSON.stringify(response.results[0].properties, null, 2));
+
     let htmlSlides = '';
     response.results.forEach(page => {
-        const title = page.properties.Nome?.title[0]?.plain_text || 'Sem Título';
+        // Tenta encontrar o título em diferentes formatos
+        const title = page.properties.Name?.title[0]?.plain_text || page.properties.Nome?.title[0]?.plain_text || 'Sem Título';
         const imageUrl = page.properties.Capa?.files[0]?.file?.url || 'https://via.placeholder.com/400';
         const slug = page.properties.URL?.rich_text[0]?.plain_text || page.id;
 
@@ -213,7 +217,8 @@ app.get('/projetos', async (req, res) => {
 
     let htmlCards = '';
     response.results.forEach(page => {
-        const title = page.properties.Nome?.title[0]?.plain_text || 'Sem Título';
+        // Tenta encontrar o título em diferentes formatos
+        const title = page.properties.Name?.title[0]?.plain_text || page.properties.Nome?.title[0]?.plain_text || 'Sem Título';
         const year = page.properties.Ano?.number || '';
         const imageUrl = page.properties.Capa?.files[0]?.file?.url || 'https://via.placeholder.com/400';
         const slug = page.properties.URL?.rich_text[0]?.plain_text || page.id;
