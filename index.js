@@ -146,16 +146,52 @@ function getLayoutHtml(pageTitle, bodyContent) {
 // --- ROTAS DO SERVIDOR ---
 
 app.get('/', async (req, res) => {
-    // Como a Home também pode ter conteúdo dinâmico do banco de dados,
-    // a rota Home e Projetos serão quase iguais.
-    res.redirect('/projetos');
+    const databaseId = process.env.NOTION_DATABASE_ID;
+    const response = await notion.databases.query({
+        database_id: databaseId,
+        filter: {
+            property: 'Home',
+            checkbox: {
+                equals: true
+            }
+        }
+    });
+
+    let htmlCards = '';
+    response.results.forEach(page => {
+        const title = page.properties.Nome?.title[0]?.plain_text || 'Sem Título';
+        const year = page.properties.Ano?.number || '';
+        const imageUrl = page.properties.Capa?.files[0]?.file?.url || 'https://via.placeholder.com/400';
+        const slug = page.properties.URL?.rich_text[0]?.plain_text || page.id;
+        const type = page.properties.Tipo?.select?.name || 'Sem Tipo';
+
+        htmlCards += `
+            <a href="/projetos/${slug}" style="text-decoration: none; color: inherit;">
+                <div class="card">
+                    <img src="${imageUrl}" alt="${title}">
+                    <div class="card-content">
+                        <h3>${title}</h3>
+                        <p>${type} • ${year}</p>
+                    </div>
+                </div>
+            </a>
+        `;
+    });
+    
+    const bodyContent = `
+        <h1>Home</h1>
+        <div class="card-grid">
+            ${htmlCards}
+        </div>
+    `;
+
+    res.send(getLayoutHtml('Home - 0e1', bodyContent));
 });
 
 app.get('/projetos', async (req, res) => {
     const databaseId = process.env.NOTION_DATABASE_ID;
     const response = await notion.databases.query({ database_id: databaseId });
 
-    // Extrai os tipos únicos para o menu de filtro
     const projectTypes = [...new Set(response.results.map(page => page.properties.Tipo?.select?.name || 'Todos'))];
     const filterMenu = `<div class="filter-menu">
         <a href="/projetos?filter=Todos">Todos</a>
@@ -168,6 +204,7 @@ app.get('/projetos', async (req, res) => {
         const year = page.properties.Ano?.number || '';
         const imageUrl = page.properties.Capa?.files[0]?.file?.url || 'https://via.placeholder.com/400';
         const slug = page.properties.URL?.rich_text[0]?.plain_text || page.id;
+        const type = page.properties.Tipo?.select?.name || 'Sem Tipo';
 
         htmlCards += `
             <a href="/projetos/${slug}" style="text-decoration: none; color: inherit;">
@@ -175,7 +212,7 @@ app.get('/projetos', async (req, res) => {
                     <img src="${imageUrl}" alt="${title}">
                     <div class="card-content">
                         <h3>${title}</h3>
-                        <p>${year}</p>
+                        <p>${type} • ${year}</p>
                     </div>
                 </div>
             </a>
