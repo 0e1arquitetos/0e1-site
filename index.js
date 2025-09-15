@@ -5,27 +5,16 @@ require('dotenv').config();
 const express = require('express');
 const { Client } = require('@notionhq/client');
 
-// Inicializa o cliente da API do Notion
 const notion = new Client({ auth: process.env.NOTION_TOKEN });
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Função para buscar os blocos de uma página e convertê-los em HTML
-async function renderPageById(pageId) {
-    try {
-        const blocks = await notion.blocks.children.list({ block_id: pageId });
-        return renderBlocksToHtml(blocks.results);
-    } catch (error) {
-        console.error('Erro ao buscar a página:', error.body || error);
-        return '<h1>Erro ao carregar o conteúdo.</h1>';
-    }
-}
-
-// Função para converter os blocos do Notion em HTML
-function renderBlocksToHtml(blocks) {
+// Esta função agora é assíncrona para buscar o conteúdo de blocos sincronizados
+async function renderBlocksToHtml(blocks) {
     let htmlContent = '';
-    blocks.forEach(block => {
+
+    for (const block of blocks) {
         const blockType = block.type;
         const blockContent = block[blockType];
 
@@ -57,23 +46,42 @@ function renderBlocksToHtml(blocks) {
                 htmlContent += `<p>[Conteúdo de base de dados embutida. Requer uma requisição separada para ser exibido.]</p>`;
                 break;
             case 'child_page':
-                // A navegação entre páginas já é feita nas rotas do Express.
-                // Este bloco seria usado para links internos.
                 htmlContent += `<h4><a href="/${blockContent.title.toLowerCase().replace(/\s/g, '-')}" >${blockContent.title}</a></h4>`;
+                break;
+            case 'synced_block':
+                // Verifica se é o bloco original ou uma cópia
+                if (blockContent.synced_from) {
+                    const syncedBlockId = blockContent.synced_from.block_id;
+                    const syncedChildren = await notion.blocks.children.list({ block_id: syncedBlockId });
+                    // Chama a função recursivamente para renderizar o conteúdo sincronizado
+                    htmlContent += await renderBlocksToHtml(syncedChildren.results);
+                }
                 break;
             default:
                 console.log(`Tipo de bloco não suportado: ${blockType}`);
                 break;
         }
-    });
+    }
     return htmlContent;
 }
 
-// Rota para a página Home
+// Esta função também se torna assíncrona por chamar a função de renderização
+async function renderPageById(pageId) {
+    try {
+        const blocks = await notion.blocks.children.list({ block_id: pageId });
+        return await renderBlocksToHtml(blocks.results);
+    } catch (error) {
+        console.error('Erro ao buscar a página:', error.body || error);
+        return '<h1>Erro ao carregar o conteúdo.</h1>';
+    }
+}
+
+
+// --- ROTAS DO SERVIDOR ---
+
 app.get('/', async (req, res) => {
     const renderedStaticHtml = await renderPageById(process.env.NOTION_HOME_PAGE_ID);
     
-    // Busca os cards do banco de dados para o slideshow
     const databaseId = process.env.NOTION_DATABASE_ID;
     const response = await notion.databases.query({ database_id: databaseId });
 
@@ -95,7 +103,6 @@ app.get('/', async (req, res) => {
         `;
     });
     
-    // Renderiza a página Home com o conteúdo estático + os cards
     res.send(`
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -116,12 +123,9 @@ app.get('/', async (req, res) => {
     `);
 });
 
-// Rota para a página de Projetos
 app.get('/projetos', async (req, res) => {
-    // 1. Busca o conteúdo estático da página "Projetos" (incluindo o menu)
     const renderedStaticHtml = await renderPageById(process.env.NOTION_PROJETOS_PAGE_ID);
 
-    // 2. Busca os dados dos projetos na base de dados
     const databaseId = process.env.NOTION_DATABASE_ID;
     const response = await notion.databases.query({ database_id: databaseId });
 
@@ -145,7 +149,6 @@ app.get('/projetos', async (req, res) => {
         `;
     });
     
-    // 3. Combina o conteúdo estático e dinâmico
     res.send(`
         <!DOCTYPE html>
         <html lang="pt-BR">
@@ -166,7 +169,6 @@ app.get('/projetos', async (req, res) => {
     `);
 });
 
-// Rota para páginas de projeto individuais
 app.get('/projetos/:slug', async (req, res) => {
     const { slug } = req.params;
     try {
@@ -204,7 +206,6 @@ app.get('/projetos/:slug', async (req, res) => {
     }
 });
 
-// Rota para a página Sobre
 app.get('/sobre', async (req, res) => {
     const renderedHtml = await renderPageById(process.env.NOTION_SOBRE_PAGE_ID);
     res.send(`
@@ -224,7 +225,6 @@ app.get('/sobre', async (req, res) => {
     `);
 });
 
-// Rota para a página Contato
 app.get('/contato', async (req, res) => {
     const renderedHtml = await renderPageById(process.env.NOTION_CONTATO_PAGE_ID);
     res.send(`
@@ -244,7 +244,6 @@ app.get('/contato', async (req, res) => {
     `);
 });
 
-// Inicia o servidor
 app.listen(port, () => {
     console.log(`Servidor rodando em http://localhost:${port}`);
 });
