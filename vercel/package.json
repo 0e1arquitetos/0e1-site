@@ -1,0 +1,15 @@
+{
+  "name": "meu-site-notion",
+  "version": "1.0.0",
+  "description": "Um site estático gerado a partir de uma página do Notion.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@notionhq/client": "^2.2.14",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  },
+  "license": "ISC"
+}
