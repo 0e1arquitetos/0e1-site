@@ -105,7 +105,6 @@ async function renderPageById(pageId) {
     }
 }
 
-// Função para gerar o layout completo da página, incluindo cabeçalho e rodapé
 function getLayoutHtml(pageTitle, bodyContent) {
     return `
         <!DOCTYPE html>
@@ -124,7 +123,14 @@ function getLayoutHtml(pageTitle, bodyContent) {
                 .card img { width: 100%; height: 200px; object-fit: cover; display: block; }
                 .card-content { padding: 16px; }
                 footer { text-align: center; margin-top: 40px; padding: 20px; border-top: 1px solid #eee; }
+                
+                /* Estilos do Carrossel (Swiper) */
+                .swiper { width: 100%; height: 100%; }
+                .swiper-slide { text-align: center; font-size: 18px; background: #fff; display: flex; justify-content: center; align-items: center; }
+                .swiper-slide a { display: block; width: 100%; height: 100%; }
+                .swiper-slide img { display: block; width: 100%; height: 100%; object-fit: cover; }
             </style>
+            <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.css">
         </head>
         <body>
             <div class="nav-menu">
@@ -138,6 +144,18 @@ function getLayoutHtml(pageTitle, bodyContent) {
             <footer>
                 ZERO E UM | arquitetos
             </footer>
+            <script src="https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.js"></script>
+            <script>
+                // Código JavaScript para inicializar o Swiper
+                new Swiper('.swiper-home-carousel', {
+                    loop: true,
+                    autoplay: {
+                        delay: 5000,
+                        disableOnInteraction: false,
+                    },
+                    // Adicione mais opções do Swiper aqui conforme necessário
+                });
+            </script>
         </body>
         </html>
     `;
@@ -157,31 +175,26 @@ app.get('/', async (req, res) => {
         }
     });
 
-    let htmlCards = '';
+    let htmlSlides = '';
     response.results.forEach(page => {
         const title = page.properties.Nome?.title[0]?.plain_text || 'Sem Título';
-        const year = page.properties.Ano?.number || '';
         const imageUrl = page.properties.Capa?.files[0]?.file?.url || 'https://via.placeholder.com/400';
         const slug = page.properties.URL?.rich_text[0]?.plain_text || page.id;
-        const type = page.properties.Tipo?.select?.name || 'Sem Tipo';
 
-        htmlCards += `
-            <a href="/projetos/${slug}" style="text-decoration: none; color: inherit;">
-                <div class="card">
+        htmlSlides += `
+            <div class="swiper-slide">
+                <a href="/projetos/${slug}">
                     <img src="${imageUrl}" alt="${title}">
-                    <div class="card-content">
-                        <h3>${title}</h3>
-                        <p>${type} • ${year}</p>
-                    </div>
-                </div>
-            </a>
+                </a>
+            </div>
         `;
     });
     
     const bodyContent = `
-        <h1>Home</h1>
-        <div class="card-grid">
-            ${htmlCards}
+        <div class="swiper swiper-home-carousel">
+            <div class="swiper-wrapper">
+                ${htmlSlides}
+            </div>
         </div>
     `;
 
