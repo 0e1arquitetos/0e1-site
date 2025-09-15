@@ -10,6 +10,19 @@ const notion = new Client({ auth: process.env.NOTION_TOKEN });
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Função auxiliar para renderizar Rich Text com links
+function renderRichText(richTextArray) {
+    let html = '';
+    richTextArray.forEach(text => {
+        if (text.href) {
+            html += `<a href="${text.href}">${text.plain_text}</a>`;
+        } else {
+            html += text.plain_text;
+        }
+    });
+    return html;
+}
+
 // Esta função agora é assíncrona para buscar o conteúdo de blocos sincronizados
 async function renderBlocksToHtml(blocks) {
     let htmlContent = '';
@@ -20,26 +33,20 @@ async function renderBlocksToHtml(blocks) {
 
         switch (blockType) {
             case 'paragraph':
-                const paragraphText = blockContent.rich_text.map(rt => rt.plain_text).join('');
-                htmlContent += `<p>${paragraphText}</p>`;
+                htmlContent += `<p>${renderRichText(blockContent.rich_text)}</p>`;
                 break;
             case 'heading_1':
-                const h1Text = blockContent.rich_text.map(rt => rt.plain_text).join('');
-                htmlContent += `<h1>${h1Text}</h1>`;
+                htmlContent += `<h1>${renderRichText(blockContent.rich_text)}</h1>`;
                 break;
             case 'heading_2':
-                const h2Text = blockContent.rich_text.map(rt => rt.plain_text).join('');
-                htmlContent += `<h2>${h2Text}</h2>`;
+                htmlContent += `<h2>${renderRichText(blockContent.rich_text)}</h2>`;
                 break;
             case 'image':
                 const imageUrl = blockContent.file?.url || blockContent.external?.url;
                 htmlContent += `<img src="${imageUrl}" alt="Imagem do Notion" style="max-width: 100%; height: auto;">`;
                 break;
             case 'toggle':
-                const toggleTitle = blockContent.rich_text.map(rt => rt.plain_text).join('');
-                // Note: Esta é uma solução simplificada para o toggle.
-                // Para renderizar o conteúdo interno, seria necessária uma nova requisição
-                // ou uma lógica mais complexa de recursão.
+                const toggleTitle = renderRichText(blockContent.rich_text);
                 htmlContent += `<details><summary><h3>${toggleTitle}</h3></summary></details>`;
                 break;
             case 'child_database':
@@ -49,11 +56,9 @@ async function renderBlocksToHtml(blocks) {
                 htmlContent += `<h4><a href="/${blockContent.title.toLowerCase().replace(/\s/g, '-')}" >${blockContent.title}</a></h4>`;
                 break;
             case 'synced_block':
-                // Verifica se é o bloco original ou uma cópia
                 if (blockContent.synced_from) {
                     const syncedBlockId = blockContent.synced_from.block_id;
                     const syncedChildren = await notion.blocks.children.list({ block_id: syncedBlockId });
-                    // Chama a função recursivamente para renderizar o conteúdo sincronizado
                     htmlContent += await renderBlocksToHtml(syncedChildren.results);
                 }
                 break;
@@ -65,7 +70,6 @@ async function renderBlocksToHtml(blocks) {
     return htmlContent;
 }
 
-// Esta função também se torna assíncrona por chamar a função de renderização
 async function renderPageById(pageId) {
     try {
         const blocks = await notion.blocks.children.list({ block_id: pageId });
